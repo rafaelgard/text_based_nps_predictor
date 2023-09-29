@@ -1,0 +1,5 @@
+# Ignore paths that may contain user-generated content
+/files/*
+/env/*
+MyApp_avalia_comentarios_NPS.py
+avalia_comentarios_NPS.py

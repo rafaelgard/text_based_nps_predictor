@@ -136,7 +136,7 @@ def remove_pontuacao(review):
 
     review = str(review)
     review = "".join(
-        [char for char in review if char not in string.punctuation])
+        [char for char in review if char not in string.punctuation and char not in string.digits])
     return review
 
 

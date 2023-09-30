@@ -1,3 +1,6 @@
 # Ignore paths that may contain user-generated content
 /database/*
 /env/*
+/tests/*
+.pytest_cache/*
+pytest_cache/*

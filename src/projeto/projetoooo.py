@@ -21,7 +21,7 @@ from enelvo.normaliser import Normaliser
 
 def make_model():
     '''Importação dos dados'''
-    df = pd.read_csv(r'database/dataframe_final.csv')
+    df = pd.read_csv(r'src/database/dataframe_final.csv')
 
     # dropa os dados nulos
     df.dropna(inplace=True)
@@ -54,6 +54,7 @@ def make_model():
     x = df['Comentário'].astype('str')
     y = df['TARGET']
 
+    # separando os dados em conjunto de teste e treino
     X_train, X_test, y_train, y_test = train_test_split(
         x, y, test_size=0.3, random_state=30, stratify=y)
 
@@ -70,7 +71,7 @@ def make_model():
     model.fit(X_train_vectorizer, y_train)
 
     # salvando o modelo
-    dump((model, X_train_vectorizer, vectorizer), 'models/model.joblib')
+    dump((model, X_train_vectorizer, vectorizer), 'src/models/model.joblib')
 
     # fazendo as previsões no conjunto de teste
     y_pred = model.predict(X_test_vectorizer)
@@ -82,14 +83,13 @@ def make_model():
     print(f'\nAcurácia: {accuracy:.2f}')
     print(f'\nRelatório de Classificação:\n', report)
 
-    cross_val_score = cross_val_score(
-        estimator=model, X=X_test_vectorizer, y=y_test, cv=5, n_jobs=-1)  # y_test, y_pred
+    cross_val_score_result = cross_val_score(
+        estimator=model, X=X_test_vectorizer, y=y_test, cv=5, n_jobs=-1)
 
     print('Resultado da validação cruzada')
-    print(cross_val_score, '\n')
+    print(cross_val_score_result, '\n')
 
-    print(
-        f'Média do resultado da validação cruzada: {round(cross_val_score.mean(), 2)}')
+    print(f'Média do resultado da validação cruzada: {round(cross_val_score_result.mean(), 2)}\n')
 
     return model, vectorizer
 
@@ -142,7 +142,7 @@ def remove_pontuacao(review):
 
 def load_model():
     '''Carrega o modelo treinado'''
-    model, X_train_vectorizer, vectorizer = load('models/model.joblib')
+    model, X_train_vectorizer, vectorizer = load('src\models\model.joblib')
     return model, X_train_vectorizer, vectorizer
 
 
@@ -161,10 +161,10 @@ def avalia_nota(x):
     return classificacao
 
 # Ative para fazer previsões em novos comentários
-# new_comments = ["Este serviço é excelente!",
-#                 "Estou insatisfeito com o atendimento e o produto é horrível",
-#                 "Péssimo cartão! Não fui bem atendida e meu limite é baixo"
-#                 ]
+new_comments = ["Este serviço é excelente!",
+                "Estou insatisfeito com o atendimento e o produto é horrível",
+                "Péssimo cartão! Não fui bem atendida e meu limite é baixo"
+                ]
 
 # caso queira treinar o modelo
 # model, vectorizer = make_model()

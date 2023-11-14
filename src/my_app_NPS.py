@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 # from avalia_comentarios_NPS import avalia_comentarios, importa
-from projeto import classifica_nps, load_model
+from projeto.projeto import classifica_nps, load_model
 # from streamlit_image_select import image_select
 # from recomendation_system import recomenda_itens, itens_iniciais
 #  from utils import return_images_path

@@ -1,1 +1,1 @@
-import my_app_NPS, projeto
+# from src.projeto import *

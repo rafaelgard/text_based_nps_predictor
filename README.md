@@ -29,6 +29,7 @@ Um cliente respondeu uma pesquisa de satisfação e está muito insatisfeito? É
 - sklearn
 - nltk
 - spacy
+- python -m spacy download pt_core_news_sm
 - plotly
 - wordcloud
 - enelvo

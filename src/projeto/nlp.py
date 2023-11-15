@@ -100,13 +100,10 @@ class nlp_predictor:
         return model, vectorizer
 
 
-    def classifica_nps(self, model, vectorizer, comentario: str) -> np.array:
+    def classifica_nps(self, model, vectorizer, data) -> (np.array, np.array):
         "Classifica o nps baseado em um ou mais comentários e retorna o resultado"
-
-        if type(comentario) == str:
-            comentario = np.array([comentario])
-
-        comentarios_tfidf = vectorizer.transform(comentario)
+    
+        comentarios_tfidf = vectorizer.transform(data)
 
         probabilities = model.predict_proba(comentarios_tfidf)
         resultado = model.predict(comentarios_tfidf)
@@ -149,7 +146,7 @@ class nlp_predictor:
 
     def load_model(self):
         '''Carrega o modelo treinado'''
-        model, X_train_vectorizer, vectorizer = load('src\models\model.joblib')
+        model, X_train_vectorizer, vectorizer = load(r'src\models\model.joblib')
         return model, X_train_vectorizer, vectorizer
 
 
@@ -181,22 +178,22 @@ class nlp_predictor:
 
     def predict(self, data):
 
-        model, vectorizer = self.get_model()
+        comentario_valido = True
 
-        if isinstance(data,list) or isinstance(data,np.array):
+        # identifica se a variável data é lista, array ou string
+        types_tests = (isinstance(data,list), isinstance(data,np.ndarray), isinstance(data,str))
 
-            resultado, _ = self.classifica_nps(model, vectorizer, data)
+        if not any(types_tests):
+            print('O comentário inválido! Verifique a documentação do projeto!')
+            comentario_valido = False
 
-            for index, _ in enumerate(data):
-                print(f'Comentário: {data[index]}')
-                print(f'Probabilidade Final: {resultado[index]}\n')
+        elif isinstance(data,str):
+            comentario = np.array([data])
 
-# Ative para fazer previsões em novos comentários
-# new_comments = ["Este serviço é excelente!",
-#                 "Estou insatisfeito com o atendimento e o produto é horrível",
-#                 "Péssimo cartão! Não fui bem atendida e meu limite é baixo"
-#                 ]
-
-# caso queira treinar o modelo
-# nlp_object = nlp_predictor(retrain_model = False)
-# nlp_object.predict(new_comments)
+        if comentario_valido:
+            comentario = data
+            model, vectorizer = self.get_model()
+            resultado, probabilities = self.classifica_nps(model, vectorizer, comentario)
+        
+            return resultado, probabilities
+        

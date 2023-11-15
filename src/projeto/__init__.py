@@ -1,2 +1,2 @@
-# from projeto.projeto import classifica_nps, load_model
-# from nlp import *
+from .nlp import nlp_predictor
+print('init correto dentro de projeto')

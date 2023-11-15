@@ -1,4 +1,4 @@
-from src.projeto.nlp import nlp
+from src.projeto.nlp import nlp_predictor
 
 if __name__ == '__main__':
 
@@ -8,5 +8,5 @@ if __name__ == '__main__':
                 ]
 
     # caso queira treinar o modelo
-    nlp_object = nlp(retrain_model = False)
+    nlp_object = nlp_predictor(retrain_model = False)
     nlp_object.predict(new_comments)

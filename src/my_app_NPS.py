@@ -1,46 +1,9 @@
 import streamlit as st
 import pandas as pd
-import time
-# from avalia_comentarios_NPS import avalia_comentarios, importa
-from projeto.projeto import classifica_nps, load_model
-# from streamlit_image_select import image_select
-# from recomendation_system import recomenda_itens, itens_iniciais
-#  from utils import return_images_path
-
-# def return_images_path(itens_escolhidos:list):
-#     '''Retorna o caminho das imagens dos itens escolhidos'''
-
-#     images_path = {
-#                     "ARROZ": "app_images/arroz.png",
-#                     "FEIJAO CARIOCA": "app_images/feijao_carioca.png",
-#                     "AÇÚCAR": "app_images/acucar.png",
-#                     "CAFÉ": "app_images/cafe.png",
-#                     "FLOCÃO": "app_images/flocao.png",
-#                     "BISCOITO": "app_images/biscoito.png",
-#                     "LEITE": "app_images/leite.png"                   
-#                    }
-
-#     paths = []
-
-#     for item in itens_escolhidos:
-#         paths.append(images_path.get(item))
-#         print(images_path.get(item))
-
-#     return paths
-      
-
-# st.set_page_config(
-#     page_title="Sistema de Recomendação de Compras",
-#     page_icon="🧊",
-#     layout="centered",
-#     initial_sidebar_state="expanded",
-#     menu_items={
-#         'Get Help': 'https://www.extremelycoolapp.com/help',
-#         'Report a bug': "https://www.extremelycoolapp.com/bug",
-#         'About': "# This is a header. This is an *extremely* cool app!"
-#     }
-# )      
-model, X_train_vectorizer, vectorizer = load_model()
+from projeto import nlp_predictor
+ 
+nlp = nlp_predictor(False)
+model, X_train_vectorizer, vectorizer = nlp.load_model()
 
 st.title("Modelo de Previsão de NPS")
 
@@ -52,7 +15,6 @@ with col1:
 calcular=False
 
 with col2:
-    # st.button("Calcular NPS", type="primary")
     st.write('')
     st.write('')
     calcular = st.button("Calcular NPS", type="primary")
@@ -64,13 +26,8 @@ if calcular:
 
     elif comentario != "Digite o comentário" and comentario != "":
 
-        # progress_text = "Operation in progress. Please wait."
-        # my_bar = st.progress(0, text=progress_text)
-        resultado, probabilities = classifica_nps(model, vectorizer, comentario)
+        resultado, probabilities = nlp.predict(comentario)
 
-        # for percent_complete in range(100):
-        #     time.sleep(0.01)
-        #     my_bar.progress(value=percent_complete + 1, text=progress_text)
         with st.spinner('Analisando...'):
 
             prob_detrator = str(round(probabilities[0][0].astype(float)*100,2))+"%"

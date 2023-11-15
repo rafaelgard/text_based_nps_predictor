@@ -231,13 +231,19 @@ class nlp_predictor:
             print('O comentário inválido! Verifique a documentação do projeto!')
             comentario_valido = False
 
-        elif isinstance(data, str):
-            comentario = np.array([data])
-
         if comentario_valido:
-            comentario = data
+            if isinstance(data, str):
+                comentario = np.array([data])
+                comentario_valido = True
+    
+            else:
+                comentario = data
+
             model, vectorizer = self.get_model()
             resultado, probabilities = self.classifica_nps(
                 model, vectorizer, comentario)
 
             return resultado, probabilities
+        
+        else:
+            ['resultado_inválido'], [0]

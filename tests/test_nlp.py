@@ -5,6 +5,7 @@ from ..src import nlp_predictor
 
 @pytest.fixture
 def nlp_object():
+    '''Cria um objeto que será utilizado pelo pytest'''
     return nlp_predictor(retrain_model=False)
 
 
@@ -13,11 +14,7 @@ def test_carrega_classe(nlp_object) -> None:
     assert nlp_object.retrain_model == False, 'Falhou ao instanciar a classe'
 
 
-def test_carrega_modelo(nlp_object) -> None:
-    assert nlp_object.retrain_model == False, 'Falhou ao carregar o modelo'
-
-
-def test_treina_modelo(nlp_object) -> None:
+def test_modifica_atributo_classe(nlp_object) -> None:
     nlp_object.retrain_model = True
     assert nlp_object.retrain_model == True, 'Falhou ao treinar o modelo'
 

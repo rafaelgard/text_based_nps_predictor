@@ -1,28 +1,27 @@
 '''Importação das bibliotecas'''
 
+import string
+from joblib import dump, load
 import pandas as pd
 import numpy as np
 import nltk
 import spacy
-import string
-import plotly.express as px
-from joblib import dump, load
-from stop_words import get_stop_words
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.naive_bayes import MultinomialNB
-from wordcloud import WordCloud, ImageColorGenerator
+from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 from sklearn.metrics import accuracy_score
 from enelvo.normaliser import Normaliser
 
+
 class nlp_predictor:
     def __init__(self, retrain_model):
         '''Classe que permite a utilização dos métodos implementados'''
-        
-        # se retrain_model=True, o modelo é retreinado, caso contrário é carregado um modelo já treinado
+        # se retrain_model=True, o modelo é retreinado,
+        # caso contrário é carregado um modelo já treinado
         self.retrain_model = retrain_model
 
     def make_model(self):
@@ -39,7 +38,7 @@ class nlp_predictor:
         df['Comentário'] = self.corrige_gramatica(df['Comentário'])
 
         # Remove a pontuação dos reviews
-        df['Comentário'] = df['Comentário'].apply(lambda x: self.remove_pontuacao(x))
+        df['Comentário'] = df['Comentário'].apply(self.remove_pontuacao)
 
         # lematiza a coluna comentário
         # Carregando o modelo em português do Brasil do spaCy
@@ -95,21 +94,65 @@ class nlp_predictor:
         print('Resultado da validação cruzada')
         print(cross_val_score_result, '\n')
 
-        print(f'Média do resultado da validação cruzada: {round(cross_val_score_result.mean(), 2)}\n')
+        print(
+            f'Média do resultado da validação cruzada: {round(cross_val_score_result.mean(), 2)}\n')
 
         return model, vectorizer
 
+    def create_wordcloud(self, column):
+        '''Cria uma word cloud de uma coluna específica do dataframe'''
+
+        '''Importação dos dados'''
+        df = pd.read_csv(r'src/database/dataframe_final.csv', usecols=column)
+
+        # dropa os dados nulos
+        df.dropna(inplace=True)
+
+        # transforma todos os comentários para minúsculo
+        df[column] = df[column].str.lower()
+
+        # corrige a gramática
+        df[column] = self.corrige_gramatica(df[column])
+
+        # Remove a pontuação dos reviews
+        df[column] = df[column].apply(self.remove_pontuacao)
+        
+        # lematiza a coluna comentário
+        # Carregando o modelo em português do Brasil do spaCy
+        nlp = spacy.load("pt_core_news_sm")
+
+        df[column] = df[column].apply(
+            lambda x: " ".join(self.lemmatize_words(x, nlp)))
+
+        df.index = np.arange(df.shape[0])
+
+        df.drop_duplicates(keep='last', inplace=True, ignore_index=True)
+
+        # juntando todos os comentários para construir a wordcloud
+        todos_os_comentarios = "".join(comentario for comentario in df[column])
+
+        # instanciando a wordcloud
+        wordcloud = WordCloud(stopwords=nltk.corpus.stopwords.words('portuguese'),
+                              background_color='black', width=1600,
+                              height=800, max_words=1000,  max_font_size=500,
+                              min_font_size=1).generate(todos_os_comentarios)  # mask=mask,
+
+        # exibindo a wordcloud
+        _, ax = plt.subplots(figsize=(16, 8))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.set_axis_off()
+        plt.imshow(wordcloud)
+        plt.savefig('images/new_wordcloud.png')
 
     def classifica_nps(self, model, vectorizer, data) -> (np.array, np.array):
         "Classifica o nps baseado em um ou mais comentários e retorna o resultado"
-    
+
         comentarios_tfidf = vectorizer.transform(data)
 
         probabilities = model.predict_proba(comentarios_tfidf)
         resultado = model.predict(comentarios_tfidf)
 
         return resultado, probabilities
-
 
     def lemmatize_words(self, text, nlp):
         '''Lematiza uma lista de palavras'''
@@ -120,13 +163,12 @@ class nlp_predictor:
 
         return lemmatized_words
 
-
     def corrige_gramatica(self, coluna):
         '''Conserta abreviações, potuações e remove emojis'''
 
         norm = Normaliser(tokenizer='readable', sanitize=True)
 
-        # Usa a função vectorize do NumPy para aplicar a normalização 
+        # Usa a função vectorize do NumPy para aplicar a normalização
         # a todos os elementos em uma única chamada
         normalizar = np.vectorize(norm.normalise)
 
@@ -134,21 +176,20 @@ class nlp_predictor:
 
         return coluna_normalizada
 
-
     def remove_pontuacao(self, review):
         '''# Remove a pontuação dos comentários'''
 
         review = str(review)
         review = "".join(
-            [char for char in review if char not in string.punctuation and char not in string.digits])
+            [char for char in review if char not in string.punctuation
+             and char not in string.digits])
         return review
-
 
     def load_model(self):
         '''Carrega o modelo treinado'''
-        model, X_train_vectorizer, vectorizer = load(r'src\models\model.joblib')
+        model, X_train_vectorizer, vectorizer = load(
+            r'src\models\model.joblib')
         return model, X_train_vectorizer, vectorizer
-
 
     def avalia_nota(self, x):
         '''Avalia a nota e retorna a classificação do NPS'''
@@ -156,44 +197,47 @@ class nlp_predictor:
         if x >= 9:
             classificacao = 'Promotor'
 
-        elif x == 7 or x == 8:
+        elif x in (7, 8):
             classificacao = 'Neutro'
 
         else:
             classificacao = 'Detrator'
 
         return classificacao
-    
+
     def get_model(self):
         '''Carrega o modelo e o vectorizer levando em consideração a escolha do usuário de
         treinar o modelo ou utilizar um modelo carregado'''
 
         if self.retrain_model:
-           model, vectorizer = self.make_model()
-        
+            model, vectorizer = self.make_model()
+
         else:
             model, _, vectorizer = self.load_model()
 
         return model, vectorizer
 
     def predict(self, data):
+        '''Avalia uma lista ou array de strings e faz a 
+        previsão da classificação'''
 
         comentario_valido = True
 
         # identifica se a variável data é lista, array ou string
-        types_tests = (isinstance(data,list), isinstance(data,np.ndarray), isinstance(data,str))
+        types_tests = (isinstance(data, list), isinstance(
+            data, np.ndarray), isinstance(data, str))
 
         if not any(types_tests):
             print('O comentário inválido! Verifique a documentação do projeto!')
             comentario_valido = False
 
-        elif isinstance(data,str):
+        elif isinstance(data, str):
             comentario = np.array([data])
 
         if comentario_valido:
             comentario = data
             model, vectorizer = self.get_model()
-            resultado, probabilities = self.classifica_nps(model, vectorizer, comentario)
-        
+            resultado, probabilities = self.classifica_nps(
+                model, vectorizer, comentario)
+
             return resultado, probabilities
-        

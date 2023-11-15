@@ -5,6 +5,7 @@ from ..src import nlp_predictor
 
 @pytest.fixture
 def nlp_object():
+    '''Cria um objeto que será utilizado pelo pytest'''
     return nlp_predictor(retrain_model=False)
 
 

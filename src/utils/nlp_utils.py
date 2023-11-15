@@ -1,10 +1,11 @@
-from joblib import dump, load
+from joblib import load
 import numpy as np
+
 
 def classifica_nps(model, vectorizer, comentario: str) -> np.array:
     "Classifica o nps baseado em um ou mais comentários e retorna o resultado"
 
-    if type(comentario) == str:
+    if isinstance(comentario, str):
         comentario = np.array([comentario])
 
     comentarios_tfidf = vectorizer.transform(comentario)

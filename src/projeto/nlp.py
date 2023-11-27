@@ -23,14 +23,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import cross_val_score
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding, LSTM, Dense
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-
-
-
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from transformers import BertTokenizer, BertModel
+import torch
+import lightgbm as lgb
 
 
 class nlp_predictor:
@@ -149,84 +147,87 @@ class nlp_predictor:
         # dropa os dados nulos
         df.dropna(inplace=True)
 
-        # transforma todos os comentários para minúsculo
-        df['Comentário'] = df['Comentário'].str.lower()
+        # # transforma todos os comentários para minúsculo
+        # df['Comentário'] = df['Comentário'].str.lower()
 
-        # corrige a gramática
-        df['Comentário'] = self.corrige_gramatica(df['Comentário'])
+        # # corrige a gramática
+        # df['Comentário'] = self.corrige_gramatica(df['Comentário'])
 
-        # Remove a pontuação dos reviews
-        df['Comentário'] = df['Comentário'].apply(self.remove_pontuacao)
+        # # Remove a pontuação dos reviews
+        # df['Comentário'] = df['Comentário'].apply(self.remove_pontuacao)
 
-        # lematiza a coluna comentário
-        # Carregando o modelo em português do Brasil do spaCy
-        nlp = spacy.load("pt_core_news_sm")
+        # # lematiza a coluna comentário
+        # # Carregando o modelo em português do Brasil do spaCy
+        # nlp = spacy.load("pt_core_news_sm")
 
-        df['Comentário'] = df['Comentário'].apply(
-            lambda x: " ".join(self.lemmatize_words(x, nlp)))
+        # df['Comentário'] = df['Comentário'].apply(
+        #     lambda x: " ".join(self.lemmatize_words(x, nlp)))
 
-        df.index = np.arange(df.shape[0])
+        # df.index = np.arange(df.shape[0])
 
         df['TARGET'] = df['Nota'].apply(lambda x: self.avalia_nota(x))
 
-        df = df[df['Comentário'].isna() == False]
+        # df = df[df['Comentário'].isna() == False]
 
-        df.drop_duplicates(keep='last', inplace=True, ignore_index=True)
+        # df.drop_duplicates(keep='last', inplace=True, ignore_index=True)
 
-        # Dividindo os dados em conjunto de treinamento e conjunto de teste
+        # # Dividindo os dados em conjunto de treinamento e conjunto de teste
+        
+        # Pré-processamento dos dados
+        tokenizer = BertTokenizer.from_pretrained('neuralmind/bert-base-portuguese-cased')
+        df['tokenized_comments'] = df['Comentário'].apply(lambda x: tokenizer.encode(x, add_special_tokens=True))
+
+        # Converta categorias em rótulos numéricos
+        category_mapping = {'Promotor': 0, 'Neutro': 1, 'Detrator': 2}
+        df['label'] = df['TARGET'].map(category_mapping)
+
+
         x = df['Comentário'].astype('str')
-        y = df['TARGET']
+        y = df['label']
 
-        # Label Encoding for categorical target variable
-        label_encoder = LabelEncoder()
-        y_encoded = label_encoder.fit_transform(y)
+        #['Comentário', 'Nota', 'TARGET', 'tokenized_comments', 'label']
 
-        # separando os dados em conjunto de teste e treino
-        X_train, X_test, y_train, y_test = train_test_split(
-            x, y_encoded, test_size=0.3, random_state=30, stratify=y_encoded)
 
-        # Tokenizing and Padding
-        max_words = 5000
-        max_len = 100
-        tokenizer = Tokenizer(num_words=max_words)
-        tokenizer.fit_on_texts(X_train)
-        X_train_seq = tokenizer.texts_to_sequences(X_train)
-        X_test_seq = tokenizer.texts_to_sequences(X_test)
-        X_train_pad = pad_sequences(X_train_seq, maxlen=max_len)
-        X_test_pad = pad_sequences(X_test_seq, maxlen=max_len)
+        # breakpoint()
+        # Separar os dados em treino e teste
+        train_df, test_df = train_test_split(df[['Comentário','label']], test_size=0.2, random_state=42)
 
-        # Build the RNN model
-        model = Sequential()
-        model.add(Embedding(max_words, 50, input_length=max_len))
-        model.add(LSTM(100))
-        model.add(Dense(len(label_encoder.classes_), activation='softmax'))
+        print('Bert')
+        # Obter embeddings BERT para os comentários
+        bert_model = BertModel.from_pretrained('neuralmind/bert-base-portuguese-cased')
 
-        # Compile the model
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        def get_bert_embedding(comment):
+            input_ids = torch.tensor([tokenizer.encode(comment, add_special_tokens=True)])
+            return bert_model(input_ids)[1].detach().numpy()[0]
 
-        # Train the model
-        model.fit(X_train_pad, y_train, epochs=5, batch_size=32, validation_split=0.2)
+        train_df['bert_embeddings'] = train_df['Comentário'].apply(get_bert_embedding)
+        test_df['bert_embeddings'] = test_df['Comentário'].apply(get_bert_embedding)
 
-        # Evaluate the model
-        y_pred = np.argmax(model.predict(X_test_pad), axis=-1)
-        accuracy = accuracy_score(y_test, y_pred)
-        print(f'Test accuracy: {accuracy:.4f}')
+
+        # Verifique as dimensões dos embeddings
+        print(f"Dimensões dos embeddings de treino: {train_df['bert_embeddings'].apply(lambda x: x.shape).unique()}")
+        print(f"Dimensões dos embeddings de teste: {test_df['bert_embeddings'].apply(lambda x: x.shape).unique()}")
+
+
+        train_embeddings_array = np.array(list(train_df['bert_embeddings']))
+        train_data = lgb.Dataset(train_embeddings_array, label=train_df['label'])
+
+        # Treinamento do modelo LightGBM
+        params = {'objective': 'multiclass', 'num_class': 3}
+        model = lgb.train(params, train_data, num_boost_round=100)
+
+        # Previsões no conjunto de teste
+        test_predictions = model.predict(list(test_df['bert_embeddings'])).argmax(axis=1)
+
+        # Avaliação do modelo
+        accuracy = accuracy_score(test_df['label'], test_predictions)
+        print(f'Acurácia do modelo: {accuracy}')
+
+        # Generate a classification report
+        report = classification_report(test_df['label'], test_predictions)
+        print('Classification report:\n', report)
 
         breakpoint()
-
-        return model, tokenizer, label_encoder
-
-
-
-   
-
-
-
-
-
-
-
-
 
     def create_wordcloud(self, column):
         '''Cria uma word cloud de uma coluna específica do dataframe'''

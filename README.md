@@ -1,4 +1,9 @@
 # Text Based Nps Predictor
+
+[![CI](https://github.com/samuelcolvin/FastUI/actions/workflows/ci.yml/badge.svg)](https://github.com/rafaelgard/text_based_nps_predictor/actions?query=event%3Apush+branch%3Amain+workflow%3ACI)
+[![versions](https://img.shields.io/pypi/pyversions/fastui.svg)](https://github.com/rafaelgard/text_based_nps_predictor)
+[![license](https://img.shields.io/github/license/samuelcolvin/FastUI.svg)](https://github.com/rafaelgard/text_based_nps_predictor/blob/main/LICENSE)
+
 ![Alt text](src/images/NPS_wordcloud.png)
 Este projeto teve como objetivo criar um classificador utlizando técnicas de NLP para fazer a previsão do NPS (Net Promoter Score) de um cliente baseado em comentários digitados pelo usuário.
 

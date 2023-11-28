@@ -4,7 +4,7 @@ from typing import Union
 
 # if __name__ == '__main__':
 
-nlp_object = nlp_predictor(retrain_model = False)
+nlp_object = nlp_predictor(model_type='', retrain_model = False)
 
 app = FastAPI()
 

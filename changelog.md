@@ -1,13 +1,13 @@
 # Changelog
 Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 
-## 1.0.0 - 30 Setembro 2023
+## 0.1 - 30 Setembro 2023
 
 ### FEATURE:
     - Adição do app criado no streamlit
     - Adição de imagens e vídeos demonstrando a utilização
 
-## 1.0.1 - 14 Novembro 2023
+## 0.2 - 14 Novembro 2023
 
 ### FEATURE:
     - Inclusão dos testes unitários com o pytest
@@ -15,4 +15,8 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 
 ### REFACTOR:
     - Reestruturação da estrutura do projeto
-   
+
+## 0.3 - 27 Novembro 2023
+### FEATURE:
+    - Inclusão do modelo Transformers - 'neuralmind/bert-base-portuguese-cased'
+    

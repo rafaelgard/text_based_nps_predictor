@@ -1,8 +1,7 @@
 import streamlit as st
 from projeto import nlp_predictor
 
-nlp = nlp_predictor(False)
-model, X_train_vectorizer, vectorizer = nlp.load_model()
+nlp = nlp_predictor(model_type='', retrain_model=False)
 
 st.title("Modelo de Previsão de NPS")
 

@@ -29,59 +29,74 @@ from sklearn.metrics import accuracy_score
 from transformers import BertTokenizer, BertModel
 import torch
 import lightgbm as lgb
+from transformers import BertForSequenceClassification, AdamW, BertConfig
 
+from torch import cuda
 
 class nlp_predictor:
-    def __init__(self, retrain_model=False):
+    def __init__(self, model_type = 'BERT', retrain_model=False):
         '''Classe que permite a utilização dos métodos implementados'''
         # se retrain_model=True, o modelo é retreinado,
         # caso contrário é carregado um modelo já treinado
         self.retrain_model = retrain_model
         self.model = None
+        self.nlp_model = None
         self.vectorizer = None
-        self.model_type = 'RNN'
+        self.tokenizer = None
+        self.model_type = model_type
         self.initial_setup()
 
     def initial_setup(self):
         '''Executa as configurações iniciais da classe'''
-        self.model, self.vectorizer = self.get_model()
 
-    def make_model(self):
-        '''Importação dos dados'''
-        df = pd.read_csv(r'src/database/dataframe_final.csv')
+        if self.model_type != 'BERT':
+            self.model, self.vectorizer = self.get_model()
 
-        # dropa os dados nulos
-        df.dropna(inplace=True)
+        elif self.model_type == 'BERT':
+            self.model, self.tokenizer = self.get_model()
+            self.nlp_model = BertModel.from_pretrained('neuralmind/bert-base-portuguese-cased')
 
+    def pre_processamento(self, dataframe):
+        
         # transforma todos os comentários para minúsculo
-        df['Comentário'] = df['Comentário'].str.lower()
+        dataframe['Comentário'] = dataframe['Comentário'].str.lower()
 
         # corrige a gramática
-        df['Comentário'] = self.corrige_gramatica(df['Comentário'])
+        dataframe['Comentário'] = self.corrige_gramatica(dataframe['Comentário'])
 
         # Remove a pontuação dos reviews
-        df['Comentário'] = df['Comentário'].apply(self.remove_pontuacao)
+        dataframe['Comentário'] = dataframe['Comentário'].apply(self.remove_pontuacao)
 
         # lematiza a coluna comentário
         # Carregando o modelo em português do Brasil do spaCy
         nlp = spacy.load("pt_core_news_sm")
 
-        df['Comentário'] = df['Comentário'].apply(
+        dataframe['Comentário'] = dataframe['Comentário'].apply(
             lambda x: " ".join(self.lemmatize_words(x, nlp)))
 
-        df.index = np.arange(df.shape[0])
+        dataframe.index = np.arange(dataframe.shape[0])
+
+        dataframe = dataframe[dataframe['Comentário'].isna() == False]
+
+        dataframe.drop_duplicates(keep='last', inplace=True, ignore_index=True)
+
+        return dataframe
+
+
+    def make_model(self):
+        '''Treina o modelo nltk e MultinomialNB'''
+        df = pd.read_csv(r'src/database/dataframe_final.csv')
+
+        # dropa os dados nulos
+        df.dropna(inplace=True)
+
+        # df = self.pre_processamento(df)
 
         df['TARGET'] = df['Nota'].apply(lambda x: self.avalia_nota(x))
-
-        df = df[df['Comentário'].isna() == False]
-
-        df.drop_duplicates(keep='last', inplace=True, ignore_index=True)
 
         # Dividindo os dados em conjunto de treinamento e conjunto de teste
         x = df['Comentário'].astype('str')
         y = df['TARGET']
-
-        breakpoint()
 
         # separando os dados em conjunto de teste e treino
         X_train, X_test, y_train, y_test = train_test_split(
@@ -97,13 +112,10 @@ class nlp_predictor:
         # print(X_train_vectorizer)
         
         # X_train_vectorizer_sem_outiliers, y_train_sem_outiliers = self.remove_outiliers(X_train_vectorizer, y_train)
-        # breakpoint()    
        
         # instanciando o modelo
-        # model = MultinomialNB()
-        
-        import lightgbm as lgb
-        model = lgb.LGBMClassifier()#colsample_bytree=0.8
+        model = MultinomialNB()
+        # model = lgb.LGBMClassifier()#colsample_bytree=0.8
 
         # treinando o modelo nos dados de treinamento
         # model.fit(X_train_vectorizer_sem_outiliers, y_train_sem_outiliers)
@@ -116,7 +128,7 @@ class nlp_predictor:
         print(classification_report(np.array(y_test),y_pred))
         
         # salvando o modelo
-        # dump((model, X_train_vectorizer_sem_outiliers, vectorizer), 'src/models/new_model.joblib')
+        dump((model, vectorizer), 'src/models/model.joblib')
 
         # fazendo as previsões no conjunto de teste
         # y_pred = model.predict(X_test_vectorizer)
@@ -137,84 +149,115 @@ class nlp_predictor:
         print(
             f'Média do resultado da validação cruzada: {round(cross_val_score_result.mean(), 2)}\n')
 
-        breakpoint()	
+        # breakpoint()	
         return model, vectorizer
 
-    def make_model_RNN(self):
-        '''Importação dos dados'''
+    def make_model_bert(self):
+        '''Treina o modelo Bert e lgb'''
+
         df = pd.read_csv(r'src/database/dataframe_final.csv')
+
+        # df = self.pre_processamento(df)
 
         # dropa os dados nulos
         df.dropna(inplace=True)
 
-        # # transforma todos os comentários para minúsculo
-        # df['Comentário'] = df['Comentário'].str.lower()
-
-        # # corrige a gramática
-        # df['Comentário'] = self.corrige_gramatica(df['Comentário'])
-
-        # # Remove a pontuação dos reviews
-        # df['Comentário'] = df['Comentário'].apply(self.remove_pontuacao)
-
-        # # lematiza a coluna comentário
-        # # Carregando o modelo em português do Brasil do spaCy
-        # nlp = spacy.load("pt_core_news_sm")
-
-        # df['Comentário'] = df['Comentário'].apply(
-        #     lambda x: " ".join(self.lemmatize_words(x, nlp)))
-
-        # df.index = np.arange(df.shape[0])
-
         df['TARGET'] = df['Nota'].apply(lambda x: self.avalia_nota(x))
 
-        # df = df[df['Comentário'].isna() == False]
+        # tokenizer = BertTokenizer.from_pretrained('neuralmind/bert-base-portuguese-cased', max_length=512)
+        tokenizer = BertTokenizer.from_pretrained('neuralmind/bert-base-portuguese-cased', do_lower_case=True)
 
-        # df.drop_duplicates(keep='last', inplace=True, ignore_index=True)
-
-        # # Dividindo os dados em conjunto de treinamento e conjunto de teste
-        
-        # Pré-processamento dos dados
-        tokenizer = BertTokenizer.from_pretrained('neuralmind/bert-base-portuguese-cased')
         df['tokenized_comments'] = df['Comentário'].apply(lambda x: tokenizer.encode(x, add_special_tokens=True))
 
         # Converta categorias em rótulos numéricos
-        category_mapping = {'Promotor': 0, 'Neutro': 1, 'Detrator': 2}
-        df['label'] = df['TARGET'].map(category_mapping)
+        # category_mapping = {'Promotor': 0, 'Neutro': 1, 'Detrator': 2}
 
+        # id2label = {0:'Promotor', 1:'Neutro', 2:'Detrator'}
+        label2id = {'Promotor': 0, 'Neutro': 1, 'Detrator': 2}
 
-        x = df['Comentário'].astype('str')
-        y = df['label']
+        # num_labels = len(id2label.keys())
 
-        #['Comentário', 'Nota', 'TARGET', 'tokenized_comments', 'label']
-
-
-        # breakpoint()
-        # Separar os dados em treino e teste
-        train_df, test_df = train_test_split(df[['Comentário','label']], test_size=0.2, random_state=42)
+        df['label'] = df['TARGET'].map(label2id)
 
         print('Bert')
         # Obter embeddings BERT para os comentários
+        # bert_model = BertModel.from_pretrained('neuralmind/bert-base-portuguese-cased')
         bert_model = BertModel.from_pretrained('neuralmind/bert-base-portuguese-cased')
+
+        # model = BertForSequenceClassification.from_pretrained(
+        #             "neuralmind/bert-base-portuguese-cased", 
+        #             num_labels = num_labels, 
+        #             id2label=id2label, 
+        #             label2id=label2id, 
+        #             output_attentions=False,
+        #             output_hidden_states=False)
+        
+        # bert_model = BertForSequenceClassification.from_pretrained(
+        #             "neuralmind/bert-base-portuguese-cased", 
+        #             num_labels = num_labels, 
+        #             id2label=id2label, 
+        #             label2id=label2id)
+        
+        # if cuda.is_available():
+        #     device = 'cuda'
+        # else: 
+        #     device = 'cpu'
+
+        # print(f'device:{device}')
+        
+        # model.to(device)
+
+        # Separar os dados em treino e teste
+        train_df, test_df = train_test_split(df[['Comentário','label']], 
+                                             test_size=0.3, 
+                                             random_state=30, 
+                                             stratify=df['label'])
 
         def get_bert_embedding(comment):
             input_ids = torch.tensor([tokenizer.encode(comment, add_special_tokens=True)])
             return bert_model(input_ids)[1].detach().numpy()[0]
+            # return model(input_ids)[1].detach().numpy()[0]
 
         train_df['bert_embeddings'] = train_df['Comentário'].apply(get_bert_embedding)
         test_df['bert_embeddings'] = test_df['Comentário'].apply(get_bert_embedding)
-
 
         # Verifique as dimensões dos embeddings
         print(f"Dimensões dos embeddings de treino: {train_df['bert_embeddings'].apply(lambda x: x.shape).unique()}")
         print(f"Dimensões dos embeddings de teste: {test_df['bert_embeddings'].apply(lambda x: x.shape).unique()}")
 
-
         train_embeddings_array = np.array(list(train_df['bert_embeddings']))
-        train_data = lgb.Dataset(train_embeddings_array, label=train_df['label'])
+        
+        X_train = train_embeddings_array
+        y_train = train_df['label']
 
+        # print('Iniciando remoção dos outiliers')
+        # X_train, y_train = self.remove_outiliers(X_train, y_train)
+        # print('Finalizou remoção dos outiliers')
+
+        # Pré-processamento dos dados
+        # from imblearn.under_sampling import ClusterCentroids
+        # from collections import Counter
+        # cc = ClusterCentroids(random_state=0)
+        # X_resampled, y_resampled = cc.fit_resample(X_train, y_train)
+        # print(sorted(Counter(y_resampled).items()))
+
+        # from imblearn.combine import SMOTEENN
+        # smote_enn = SMOTEENN(random_state=0)
+        # X_train, y_train = smote_enn.fit_resample(X_train, y_train)
+
+        train_data = lgb.Dataset(X_train, y_train)
+
+        print('Iniciou o treinamento do modelo')
         # Treinamento do modelo LightGBM
         params = {'objective': 'multiclass', 'num_class': 3}
         model = lgb.train(params, train_data, num_boost_round=100)
+
+        print('Finalizou o treinamento do modelo')
+
+        # salvando o modelo
+        dump((model, tokenizer), 'src/models/bert_model.joblib')
+        print('Modelo bert salvo!')
+        # breakpoint()
 
         # Previsões no conjunto de teste
         test_predictions = model.predict(list(test_df['bert_embeddings'])).argmax(axis=1)
@@ -227,7 +270,8 @@ class nlp_predictor:
         report = classification_report(test_df['label'], test_predictions)
         print('Classification report:\n', report)
 
-        breakpoint()
+        return model, tokenizer
+
 
     def create_wordcloud(self, column):
         '''Cria uma word cloud de uma coluna específica do dataframe'''
@@ -275,63 +319,76 @@ class nlp_predictor:
         plt.savefig('images/new_wordcloud.png')
 
     def remove_outiliers(self, X_train, y_train):
+        '''
+        Remove outiliers dos dados de treino
+
+        X_train: np.array
+        y_train: np.array
+
+        '''
+
+        print(f'X_train.shape:{X_train.shape}')
+        print(f'y_train.shape:{y_train.shape}')
 
         y_train = y_train.reset_index(drop=True)
+
         print('iniciando o remove outiliers')
         clf = ECOD()
-        clf.fit(X_train.toarray())
-        # print('predict')
-        # out = clf.predict(X_train.toarray())
-
-        X_train = X_train.toarray()
+        clf.fit(X_train)
+ 
         y_train = np.array(y_train)
 
-        out = clf.fit_predict(X_train)
+        outliers = clf.fit_predict(X_train)
 
+        # cria um dataframe pandas
         df = pd.DataFrame(X_train)
 
-        df['outliers'] = out
+        df['outliers'] = outliers
 
         df['index'] = df.index
 
         df_sem_outliers = df[df['outliers']==0].copy()
 
-        df_sem_outliers.drop(['outliers'], axis=1, inplace=True)
+        linhas = df_sem_outliers['index']
 
-        # breakpoint()
-        y_train_sem_outliers = y_train[df_sem_outliers['index']]
+        df_sem_outliers.drop(['outliers', 'index'], axis=1, inplace=True)
+
+        y_train_sem_outliers = y_train[linhas]
 
         X_train_sem_outliers = df_sem_outliers.to_numpy(copy=True)
 
-        del df, df_sem_outliers
-
-        # X_train_sem_outliers = csr_matrix(X_train_sem_outliers)
-
-        # breakpoint()
-
-        # print('scores')
-        # # get outlier scores
-        # y_train_scores = clf.decision_scores_  # raw outlier scores on the train data
-        # y_test_scores = clf.decision_function(X_test.toarray())  # predict raw outlier scores on test
-
-        # print('y_train_scores')
-        # print(y_train_scores)
-        # print(y_test_scores)
-        # print(y_test_scores)
-        # # breakpoint()
         print('Finalizou remove outliers')
+
         return X_train_sem_outliers, y_train_sem_outliers
 
+    def get_bert_embedding(self, comment):
+        input_ids = torch.tensor([self.tokenizer.encode(comment, add_special_tokens=True)])
+        return self.nlp_model(input_ids)[1].detach().numpy()[0]
+    
     def classifica_nps(self, data) -> (np.array, np.array):
         "Classifica o nps baseado em um ou mais comentários e retorna o resultado"
 
-        #todo: caso eu altere os modelos essas funções podem ter que mudar
-        comentarios_tfidf = self.vectorizer.transform(data)
+        if self.model_type != 'BERT':
+        
+            comentarios_tfidf = self.vectorizer.transform(data)
+            probabilidades = self.model.predict_proba(comentarios_tfidf)
+            resultado = self.model.predict(comentarios_tfidf)
 
-        probabilidades = self.model.predict_proba(comentarios_tfidf)
-        resultado = self.model.predict(comentarios_tfidf)
+            return resultado, probabilidades
+        
+        elif self.model_type == 'BERT':
 
-        return resultado, probabilidades
+            data_embeddings = [self.get_bert_embedding(x) for x in data]
+
+            predictions = self.model.predict(data_embeddings, num_iteration=self.model.best_iteration)
+
+            resultados = predictions.argmax(axis=1)
+            
+            id2label = {0:'Promotor', 1:'Neutro', 2:'Detrator'}
+    
+            resultados = [id2label[x] for x in resultados]
+
+            return resultados, predictions
 
     def lemmatize_words(self, text, nlp):
         '''Lematiza uma lista de palavras'''
@@ -366,9 +423,18 @@ class nlp_predictor:
 
     def load_model(self):
         '''Carrega o modelo treinado'''
-        model, X_train_vectorizer, vectorizer = load(
-            r'src\models\model.joblib')
-        return model, X_train_vectorizer, vectorizer
+
+        if self.model_type != 'BERT':
+            model, vectorizer = load(
+                r'src\models\model.joblib')
+        
+            return model, vectorizer
+    
+        elif self.model_type == 'BERT':
+            model, tokenizer = load(
+            r'src\models\bert_model.joblib')
+            
+            return model, tokenizer
 
     def avalia_nota(self, x):
         '''Avalia a nota e retorna a classificação do NPS'''
@@ -389,21 +455,24 @@ class nlp_predictor:
         treinar o modelo ou utilizar um modelo carregado'''
 
         if self.retrain_model:
-            if self.model_type == 'RNN':
-                model, tokenizer, label_encoder = self.make_model_RNN()
+            if self.model_type == 'BERT':
+                model, tokenizer = self.make_model_bert()
+                return model, tokenizer
+
             else:
                 model, vectorizer = self.make_model()
+                return model, vectorizer
 
         else:
-            if self.model_type == 'RNN':
-                pass
+            if self.model_type == 'BERT':
+                model, tokenizer = self.load_model()
+                return model, tokenizer
 
             else:
+                model, vectorizer = self.load_model()
+                return model, vectorizer
 
-                model, _, vectorizer = self.load_model()
-
-        return model, vectorizer
-
+        
     def predict(self, data):
         '''Avalia uma lista ou array de strings e faz a 
         previsão da classificação'''
@@ -434,11 +503,18 @@ class nlp_predictor:
             ['resultado_inválido'], [0]
 
 
-nlp_obj = nlp_predictor(True)
+nlp_obj = nlp_predictor(model_type = 'x', retrain_model=False)
 
-data =  ["Este serviço é excelente!",
-         "Estou insatisfeito com o atendimento e o produto é horrível",
-         "Péssimo cartão! Não fui bem atendida e meu limite é baixo"]
 
-nlp_obj.predict(data)
-breakpoint()
+# novos comentários que serão utilizados para testar o modelo gerado
+novos_comentários = ["Este serviço é excelente!",
+                     "Estou insatisfeito com o atendimento e o produto é horrível",
+                     "Péssimo cartão! Não fui bem atendida e meu limite é baixo"
+                     ]
+
+resultado, probabilidades = nlp_obj.predict(novos_comentários)
+for index, comment in enumerate(novos_comentários):
+    print(f'Comentário: {novos_comentários[index]}')
+    print(f'Resultado previsto: {resultado[index]}\n')
+
+# breakpoint()

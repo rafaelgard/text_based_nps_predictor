@@ -11,6 +11,7 @@ Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
 
 ### FEATURE:
     - Inclusão dos testes unitários com o pytest
+    - Inclusão dos testes no github actions
 
 ### REFACTOR:
     - Reestruturação da estrutura do projeto

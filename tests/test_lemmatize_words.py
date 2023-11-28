@@ -6,7 +6,7 @@ import spacy
 @pytest.fixture
 def nlp_object():
     '''Cria um objeto que será utilizado pelo pytest'''
-    return nlp_predictor(retrain_model=False)
+    return nlp_predictor(model_type = 'BERT', retrain_model=False)
 
 
 def test_lemmatize_words(nlp_object):

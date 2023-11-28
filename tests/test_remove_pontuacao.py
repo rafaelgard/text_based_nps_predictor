@@ -4,7 +4,7 @@ from ..src import nlp_predictor
 @pytest.fixture
 def nlp_object():
     '''Cria um objeto que será utilizado pelo pytest'''
-    return nlp_predictor(retrain_model=False)
+    return nlp_predictor(model_type = 'BERT', retrain_model=False)
 
 def test_remove_pontuacao_com_pontuacao(nlp_object):
     '''Teste que remove pontuação de uma string com pontuação'''

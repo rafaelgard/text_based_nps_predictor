@@ -503,7 +503,7 @@ class nlp_predictor:
             ['resultado_inválido'], [0]
 
 
-nlp_obj = nlp_predictor(model_type = 'x', retrain_model=False)
+nlp_obj = nlp_predictor(model_type = 'MultinomialNB', retrain_model=False)
 
 
 # novos comentários que serão utilizados para testar o modelo gerado
